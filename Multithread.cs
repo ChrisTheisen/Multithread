@@ -1,93 +1,175 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
-using System.Reflection;
 
-namespace MultiThread {
-    class MultiThread {
-        delegate void MagicDelegate(Control _Control, string _Value, object _OptionalMember, object[] _OptionalParameters);
+namespace Searcher {
+	internal class MultiThread {
+		private delegate void PropertyDelegate( Control control, string property, object value);
+	    private delegate object GetPropertyDelegate(Control control, string property);
+		private delegate void MethodDelegate( Control control, string method, object[] parameters );
+		private delegate void ChildPropertyDelegate( Control control, object child, string property, object value );
+		private delegate void ChildMethodDelegate( Control control, object child, string method, object[] parameters );
+
+		/// <summary>
+		/// Does magic cross thread stuff, mostly used for GUI updates from background threads.
+		/// </summary>
+		/// <param name="control">Control that might be on a different Thread</param>
+		/// <param name="propertyName">Method or Property to set or execute</param>
+		/// <param name="propertyValue">object in setting property</param>
+		public static void SetProperty(Control control, string propertyName, object propertyValue)
+		{
+			if ( control.InvokeRequired )
+			{
+				PropertyDelegate d = SetProperty;
+				control.Invoke( d, control, propertyName, propertyValue );
+			}
+			else
+			{
+				var property = control.GetType().GetProperty( propertyName );
+				if ( property == null )
+				{
+					throw new Exception(
+						$"Could not find Property {propertyName} on {control.GetType()}" );
+				}
+
+				//Set Property
+				property.SetValue(control, propertyValue);
+			}
+		}
+
         /// <summary>
-        /// Does magic cross thread stuff, I mostly use it for GUI updates from background threads.
+        /// Does magic cross thread stuff, mostly used for to get property values in background threads.
         /// </summary>
-        /// <param name="_Control">Control that might be on a different Thread</param>
-        /// <param name="_Value">Method or Property to set or execute</param>
-        /// <param name="_OptionalProperty">Takes NULL or sub-component of _Control that _Value is excecuted on</param>
-        /// <param name="_OptionalArg">Takes NULL or object used in setting or executing _Value</param>
-        public static void ControlAction(Control _Control, string _Value, object _OptionalMember, object[] _OptionalParameters) {
-            if (_Control.InvokeRequired) {
-                MagicDelegate d = new MagicDelegate(ControlAction);
-                _Control.Invoke(d, new object[] { _Control, _Value, _OptionalMember, _OptionalParameters });
+        /// <param name="control">Control that might be on a different Thread</param>
+        /// <param name="propertyName">Method or Property to get the value of</param>
+        /// <returns></returns>
+	    public static object GetProperty(Control control, string propertyName)
+	    {
+	        if (control.InvokeRequired)
+	        {
+	            GetPropertyDelegate d = GetProperty;
+	            return control.Invoke(d, control, propertyName);
+	        }
+
+	        var property = control.GetType().GetProperty(propertyName);
+	        if (property == null)
+	        {
+	            throw new Exception(
+	                $"Could not find Property {propertyName} on {control.GetType()}");
+	        }
+
+	        //Get Property
+	        return property.GetValue(control);
+        }
+
+		/// <summary>
+		/// Does magic cross thread stuff, mostly used for GUI updates from background threads.
+		/// </summary>
+		/// <param name="control">Control that might be on a different Thread</param>
+		/// <param name="methodName">name of method to execute</param>
+		/// <param name="parameters">objects used in invoking method</param>
+		public static void InvokeMethod(Control control, string methodName, object[] parameters)
+		{
+			if (control.InvokeRequired)
+			{
+				MethodDelegate d = InvokeMethod;
+				control.Invoke(d, control, methodName, parameters);
+			}
+			else
+			{
+				var paramTypes = new Type[0];
+				if (parameters != null && parameters.Length > 0)
+				{
+					paramTypes = parameters.Select(o => o.GetType()).ToArray();
+				}
+
+				var method = control.GetType().GetMethod( methodName, paramTypes );
+				if ( method == null )
+				{
+					throw new Exception(
+						$"Could not find Property {methodName.Split( '=' )[0]} on {control.GetType()}" );
+				}
+
+				//specify which method if two have the same name and invoke
+				method.Invoke( control, parameters );
+			}
+		}
+		
+		/// <summary>
+		/// Does magic cross thread stuff, mostly used for GUI updates from background threads.
+		/// </summary>
+		/// <param name="control">Control that might be on a different Thread</param>
+		/// <param name="propertyName">Property to set</param>
+		/// <param name="child">child component of control that will have property set</param>
+		/// <param name="propertyValue">object used in setting proprty</param>
+		public static void SetChildProperty( Control control, object child, string propertyName, object propertyValue )
+		{
+			if ( control.InvokeRequired )
+			{
+				ChildPropertyDelegate d = SetChildProperty;
+				control.Invoke( d, control, child, propertyName, propertyValue );
+			}
+			else
+			{
+				//Get Property Name
+				var property = child.GetType().GetProperty( propertyName );
+				if ( property == null )
+				{
+					throw new Exception(
+						$"Could not find Property {propertyName.Split( '=' )[0]} on {child.GetType()}" );
+				}
+
+				//Set Parameter
+				property.SetValue( child, propertyValue);
+			}
+		}
+		
+		/// <summary>
+		/// Does magic cross thread stuff, mostly used for GUI updates from background threads.
+		/// </summary>
+		/// <param name="control">Control that might be on a different Thread</param>
+		/// <param name="methodName">name of method to invoke</param>
+		/// <param name="child">sub-component of control that will have property set</param>
+		/// <param name="parameters">objects used in invoking method</param>
+		public static void InvokeChildMethod( Control control, object child, string methodName, object[] parameters )
+		{
+			if ( control.InvokeRequired )
+			{
+				ChildMethodDelegate d = InvokeChildMethod;
+				control.Invoke( d, control, methodName, parameters );
+			}
+			else
+			{
+				//Get Method Name
+				var paramTypes = new Type[0];
+				if ( parameters != null && parameters.Length > 0 )
+				{
+					paramTypes = parameters.Select( o => o.GetType() ).ToArray();
+				}
+				var method = child.GetType().GetMethod( methodName, paramTypes );
+				if ( method == null )
+				{
+					throw new Exception(
+						$"Could not find Property {methodName.Split( '=' )[0]} on {child.GetType()}" );
+				}
+
+				//specify which method if two have the same name and invoke
+				method.Invoke( child, parameters );
+			}
+		}
+
+		private delegate void StatusDelegate(ToolStripStatusLabel label, string value);
+        public static void UpdateToolStripStatus(ToolStripStatusLabel label, string value) {
+            if (label.GetCurrentParent().InvokeRequired) {
+                var d = new StatusDelegate(UpdateToolStripStatus);
+                label.GetCurrentParent().Invoke(d, label, value);
             }
             else {
-                try {
-                    if (_OptionalMember != null) {//Does stuff with _OptionalProperty instead of _Control
-                        if (_Value.Contains('=')) {//Handles setting Properties
-                            //Get Property Name
-                            PropertyInfo Property = _OptionalMember.GetType().GetProperty(_Value.Split(new char[] { '=' })[0]);
-
-                            //Organize Value
-                            object Value;
-                            if (_OptionalParameters != null && _OptionalParameters.Length == 1) { Value = _OptionalParameters[0]; }
-                            else { Value = _Value.Split(new char[] { '=' })[1]; }
-
-                            //Set Parameter
-                            Property.SetValue(_OptionalMember, System.Convert.ChangeType(Value, Property.PropertyType), null);
-                        }
-                        else {//Handles calling methods
-                            //Get Method Name
-                            string Method = _Value.Split("( )".ToCharArray())[0];
-
-                            //Organize Parameters
-                            object[] parameters;
-                            if (_OptionalParameters == null) { parameters = _Value.Split("( )".ToCharArray())[1].Split(", ".ToCharArray(), System.StringSplitOptions.RemoveEmptyEntries); }
-                            else { parameters = _OptionalParameters; }
-
-                            //Used to specify which method if who have the same name
-                            List<Type> Types = new List<Type>();
-                            foreach (object O in parameters) { Types.Add(O.GetType()); }
-
-                            //Execute Method
-                            _OptionalMember.GetType().GetMethod(Method, Types.ToArray()).Invoke(_OptionalMember, parameters);
-                        }
-                    }
-                    else if (_Value.Contains('=')) {//Handles setting Properties
-                        //Get Property
-                        PropertyInfo Property = _Control.GetType().GetProperty(_Value.Split(new char[] { '=' })[0]);
-
-                        //Organize Value
-                        object Value;
-                        if (_OptionalParameters != null && _OptionalParameters.Length == 1) { Value = _OptionalParameters[0]; }
-                        else { Value = _Value.Split(new char[] { '=' })[1]; }
-
-                        //Set Property
-                        Property.SetValue(_Control, System.Convert.ChangeType(Value, Property.PropertyType), null);
-                    }
-                    else {//Handles calling methods
-                        //Get method name
-                        string Method = _Value.Split("( )".ToCharArray())[0];
-
-                        //Organize parameters
-                        object[] parameters;
-                        if (_OptionalParameters == null) { parameters = _Value.Split("( )".ToCharArray())[1].Split(", ".ToCharArray(), System.StringSplitOptions.RemoveEmptyEntries); }
-                        else { parameters = _OptionalParameters; }
-
-                        //Used to specify which method if two have the same name.
-                        List<Type> Types = new List<Type>();
-                        foreach (object O in parameters) { Types.Add(O.GetType()); }
-
-                        //execute method
-                        _Control.GetType().GetMethod(Method, Types.ToArray()).Invoke(_Control, parameters);
-                    }
-                }
-                catch (System.Exception x) {
-                    if (_OptionalMember == null) {
-                        MessageBox.Show(string.Format("Error:{0} ({1}.{2} {3})", x.Message, _Control, _Value, _OptionalParameters[0]), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                    else {
-                        MessageBox.Show(string.Format("Error:{0} ({1}.{2} {3})", x.Message, _OptionalMember, _Value, _OptionalParameters[0]), "Error!", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                }
+	            if (value.Length > 50)
+	            {
+		            value = "..." + value.Substring(value.Length - 50);
+	            }
+	            label.Text = value;
             }
         }
 
