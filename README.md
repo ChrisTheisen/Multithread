@@ -14,14 +14,20 @@ Use:
 
 Examples:
 
-Sets a Label Text (lblStatus) to "Done".
+Set a property, Text (lblStatus) to "Done".
   
-    MultiThread.ControlAction(lblStatus, "Text=Done", null, null);
+    MultiThread.SetProperty(lblStatus, "Text", "Done");
+
+Update tool strip text.
+
+    MultiThread.UpdateToolStripStatus( lblDuration, $@"Duration: {duration.TotalSeconds}s" );
   
-Sets the background color of a button(btnStop) to Red.
+Invode a method, appends text to RichTextBox (rtbLog).
   
-    MultiThread.MultiThread.ControlAction(btnStop, "BackColor=", null, new object[] { Color.Red });
+    MultiThread.InvokeMethod(rtbLog, "AppendText", new object[] { message });
   
-Adds a filename to a ListBox items.
-  
-    MultiThread.ControlAction(lstResults, "Add()", lstResults.Items, new object[] { File + "\t\t" + MatchLine.Trim() });
+Set a child property, GridView.AutoSizeMode is set to DataGridViewAutoSizeColumnMode.AllCells.
+
+    MultiThread.SetChildProperty(grdResults, col, "AutoSizeMode", DataGridViewAutoSizeColumnMode.AllCells);
+    
+
